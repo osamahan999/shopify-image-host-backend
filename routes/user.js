@@ -14,11 +14,11 @@ const pool = require('../mysqlConnector'); //connection pool
  * @param {16 byte random string} salt 
  * @param {user input password} pwd 
  */
-const hashPassword = (salt, pwd) => {
-    const hash = crypto.createHash('sha256');
+const hash = (salt, pwd) => {
+    const hashAlgo = crypto.createHash('sha256');
 
-    pwd = hash.update(salt + pwd).digest('hex');
-    hash.end();
+    pwd = hashAlgo.update(salt + pwd).digest('hex');
+    hashAlgo.end();
 
     return pwd;
 
@@ -37,13 +37,13 @@ router.route('/userLogIn').post((req, res) => {
     pool.getConnection((error, connection) => {
         if (error) res.status(400).json('Error: ' + error);
 
-        connection.query("SELECT salt, password, user_id FROM user WHERE username = ?",
+        connection.query("SELECT salt, password, userUUID FROM user WHERE username = ?",
             cleanUserName, //input fields, written this way to prevent injection attacks
             (error, results, fields) => {
                 if (error) res.status(400).json('Error: ' + error);
 
-
-                if (results[0].password == hashPassword(results[0].salt, cleanPassword)) res.json({ user_id: results[0].user_id });
+                if (results.length == 0) res.status(400).json("Failed Log In");
+                else if (results[0].password == hash(results[0].salt, cleanPassword)) res.json({ userUUID: results[0].userUUID });
                 else res.status(400).json('Error: ' + error);
 
             })
@@ -70,48 +70,54 @@ router.route('/userRegister').post((req, res) => {
 
     //remove xss attack possibility
     const cleanUserName = xss(req.body.username);
+    const userUUID = hash("", xss(req.body.username)); //used as a login verification in frontend rather than returning userID
     const cleanPassword = xss(req.body.password);
     const cleanEmail = xss(req.body.email);
     const cleanFirstName = xss(req.body.firstName);
     const cleanLastName = xss(req.body.lastName);
 
-    // randomly generated salt
-    const salt = crypto.randomBytes(16).toString('hex');
+    if (cleanFirstName.length < 1 || cleanLastName.length < 1 || cleanEmail.length < 1) res.status(400).json("Invalid input");
+    else {
+        // randomly generated salt
+        const salt = crypto.randomBytes(16).toString('hex');
 
-    //has pw with random salt
-    const hashedPassword = hashPassword(salt, cleanPassword);
+        //has pw with random salt
+        const hashedPassword = hash(salt, cleanPassword);
 
 
-    //gets connection from pool
-    pool.getConnection((error, connection) => {
-        if (error) res.status(400).json('Error: ' + error);
-
-        //check for unique username
-        connection.query("SELECT * FROM user WHERE username = ?", cleanUserName, (error, results, fields) => {
-
+        //gets connection from pool
+        pool.getConnection((error, connection) => {
             if (error) res.status(400).json('Error: ' + error);
 
-            //if unique
-            else if (results.length == 0) {
+            //check for unique username
+            connection.query("SELECT * FROM user WHERE username = ?", cleanUserName, (error, results, fields) => {
 
-                var insertQuery = "INSERT INTO user (first_name, last_name, email, username, password, date_created, salt) " +
-                    "VALUES (? , ? , ? , ? , ? , NOW() , ? )";
+                if (error) res.status(400).json('Error: ' + error);
 
-                connection.query(insertQuery, [cleanFirstName, cleanLastName, cleanEmail, cleanUserName, hashedPassword, salt], (error, results, fields) => {
-                    if (error)
-                        res.status(400).json('Error: ' + error);
+                //if unique
+                else if (results.length == 0) {
 
-                    res.json("Successful register");
-                })
+                    var insertQuery = "INSERT INTO user (first_name, last_name, email, username, password, date_created, salt, userUUID) " +
+                        "VALUES (? , ? , ? , ? , ? , NOW() , ?, ? )";
+
+                    connection.query(insertQuery,
+                        [cleanFirstName, cleanLastName, cleanEmail, cleanUserName, hashedPassword, salt, userUUID],
+                        (error, results, fields) => {
+                            if (error)
+                                res.status(400).json('Error: ' + error);
+
+                            res.json("Successful register");
+                        })
 
 
-            } else {
-                res.status(400).json("Not Unique");
-            }
-            connection.release();
+                } else {
+                    res.status(400).json("Not Unique");
+                }
+                connection.release();
 
+            })
         })
-    })
+    }
 });
 
 
