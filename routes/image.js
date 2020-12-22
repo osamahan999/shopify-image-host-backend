@@ -3,6 +3,7 @@ const router = require('express').Router();
 const Cloud = require('@google-cloud/storage');
 const path = require("path");
 const util = require('util')
+const xss = require('xss'); //used for cleaning user input
 
 
 
@@ -38,45 +39,63 @@ const filesBucket = gc.bucket(bucketname);
 const upload = multer({ dest: 'uploads/' });
 
 
-router.post('/uploadImages', upload.single('file'), async (req, res) => {
+/**
+ * routes to /uploadImages, and uploads up to 6 files at once. async of course
+ */
+router.post('/uploadImages', upload.array('files', 6), async (req, res) => {
     try {
 
+        const myFile = req.files;
+        let imageUrls = [];
 
+        for (let i = 0; i < req.files.length; i++) {
+            myFile[i].originalname = xss(myFile[i].originalname); //sanitize file name
 
-        const myFile = req.file;
-        // res.json(req.file);
+            let jsonImageInfo = await uploadImageToCloud(myFile[i]);
 
-        new Promise((resolve, reject) => {
-            const { originalname, buffer } = myFile;
-            const blob = filesBucket.file(originalname.replace(/ /g, "_"));
-            const blobStream = blob.createWriteStream({
-                resumable: false
-            });
+            //adds json objects to array for each file
+            imageUrls.push(jsonImageInfo);
 
-
-            blobStream.on('finish', () => {
-                const url = "https://storage.googleapis.com/" + filesBucket.name + "/" + blob.name;
-
-                resolve(url);
-            }).on('error', () => {
-                reject(`Unable to upload image, something went wrong`)
-            }).end(buffer)
-
-        }).then((url) => {
-            res.json({
-                message: "upload was successful!",
-                data: url
-            });
-        }).catch((error) => res.json(error));
+        }
 
 
 
+        res.json(imageUrls);
 
     } catch (error) {
         res.json(error);
     }
 
 });
+
+/**
+ * Takes in a file, and returns a json with the name of the file and the URL
+ * @param {File object} file 
+ */
+function uploadImageToCloud(file) {
+    return (new Promise((resolve, reject) => {
+        const { originalname, buffer } = file;
+        const blob = filesBucket.file(originalname.replace(/ /g, "_"));
+        const blobStream = blob.createWriteStream({
+            resumable: false
+        });
+
+
+        blobStream.on('finish', () => {
+            const url = "https://storage.googleapis.com/" + filesBucket.name + "/" + blob.name;
+
+            resolve(url);
+        }).on('error', () => {
+            reject(`Unable to upload image, something went wrong`)
+        }).end(buffer)
+
+    }).then((url) => {
+        return ({ imageName: file.originalname, url: url });
+
+
+    }).catch((error) => console.log(error))
+    );
+}
 
 
 
