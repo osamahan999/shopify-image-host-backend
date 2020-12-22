@@ -4,6 +4,24 @@ const xss = require('xss'); //used for cleaning user input
 const pool = require('../mysqlConnector'); //connection pool
 
 
+router.route('/getRepos').get((req, res) => {
+    const cleanUserUUID = xss(req.query.userUUID);
+
+
+    pool.getConnection((error, connection) => {
+        if (error) res.status(400).json("Error: " + error);
+        else {
+
+
+            connection.query("SELECT name, repo_id FROM repository WHERE (owner_id = (SELECT user_id FROM user WHERE userUUID = ?)) ORDER BY date_created DESC",
+                cleanUserUUID, (error, results, fields) => {
+                    if (error) res.status(400).json('Error: ' + error);
+                    else res.json(results);
+                })
+        }
+    })
+})
+
 
 /**
  * Creates a repo and gives user owner permissions
@@ -20,10 +38,10 @@ router.route('/newRepo').post((req, res) => {
     const cleanRepoName = xss(req.body.repoName);
     const cleanPublicRepo = xss(req.body.publicRepo);
 
-    if (cleanUserUUID.length < 1 || cleanRepoName.length < 1 || (cleanPublicRepo != 'true' && cleanPublicRepo != "false")) res.status(400).json("Invalid input");
+    if (cleanUserUUID.length < 1 || cleanRepoName.length < 1) res.status(400).json("Invalid input");
     else {
         var public = false;
-        if (cleanPublicRepo == 'true') public = true;
+        if (cleanPublicRepo == true) public = true;
         //gets connection from pool
         pool.getConnection((error, connection) => {
             if (error) res.status(400).json('Error: ' + error);
