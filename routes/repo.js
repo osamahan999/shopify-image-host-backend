@@ -4,6 +4,46 @@ const xss = require('xss'); //used for cleaning user input
 const pool = require('../mysqlConnector'); //connection pool
 
 
+router.route('/deleteRepo').post((req, res) => {
+
+    const cleanUserUUID = xss(req.body.userUUID);
+    const cleanRepoID = xss(req.body.repoID);
+
+    pool.getConnection((error, connection) => {
+        if (error) res.status(400).json("Error: " + error);
+        else {
+            connection.query("SELECT * FROM user_repository_permissions WHERE repo_id = ? AND user_id = (SELECT user_id FROM user WHERE userUUID = ? )",
+                [cleanRepoID, cleanUserUUID],
+                (error, results, fields) => {
+                    if (error) res.status(400).json('Error: ' + error);
+                    else {
+                        if (results[0].canDeleteRepo) {
+                            connection.query("DELETE FROM user_repository_permissions WHERE repo_id = ?", [cleanRepoID], (error, results, fields) => {
+                                if (error) res.status(400).json('Error: ' + error);
+                                else {
+                                    connection.query("DELETE FROM repository WHERE repo_id = ?  ", [cleanRepoID], (error, results, fields) => {
+                                        if (error) res.status(400).json('Error: ' + error);
+                                        else {
+                                            res.json("Successfully deleted");
+                                        }
+                                    })
+                                }
+                            })
+                        } else {
+                            res.status(400).json("You don't have those permissions");
+                        }
+                    }
+
+                })
+        }
+
+        connection.release();
+
+    })
+
+
+})
+
 router.route('/getRepos').get((req, res) => {
     const cleanUserUUID = xss(req.query.userUUID);
 
@@ -19,7 +59,12 @@ router.route('/getRepos').get((req, res) => {
                     else res.json(results);
                 })
         }
+
+        connection.release();
+
     })
+
+
 })
 
 
