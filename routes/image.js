@@ -1,7 +1,10 @@
+
 const router = require('express').Router();
 const Cloud = require('@google-cloud/storage');
 const path = require("path");
 const util = require('util')
+
+
 
 const serviceKey = path.join(__dirname, '../config/key.json');
 const bucketname = 'shopify-image-repo-bucket';
@@ -22,40 +25,30 @@ const gc = new Storage({
     keyFilename: 'config/key.json',
     projectId: 'shopifyimagerepo'
 })
-
-
 const filesBucket = gc.bucket(bucketname);
 
-const uploadImage = (async (file) => {
-    new Promise((resolve, reject) => {
-
-        const { originalname, buffer } = file
-
-        const blob = filesBucket.file(originalname.replace(/ /g, "_"))
-        const blobStream = blob.createWriteStream({
-            resumable: false
-        })
-
-        blobStream.on('finish', () => {
-            return "https://storage.googleapis.com/" + filesBucket.name + "/" + blob.name;
-
-            resolve();
-        }).on('error', () => {
-            reject(`Unable to upload image, something went wrong`)
-        }).end(buffer)
-
-    })
-})
 
 
+// const imageStorage = multer.diskStorage({
+//     destination(req, file, cb) {
+//         cb(null, "../uploads")
+//     }
+// })
 
-router.route('/uploadImage').post(async (req, res, next) => {
+const upload = multer({ dest: 'uploads/' });
+
+
+router.post('/uploadImages', upload.single('file'), async (req, res) => {
     try {
+
+
+
         const myFile = req.file;
+        // res.json(req.file);
 
         new Promise((resolve, reject) => {
             const { originalname, buffer } = myFile;
-            const blob = filesBucket.file(originalname.replace(/ /g, "_"))
+            const blob = filesBucket.file(originalname.replace(/ /g, "_"));
             const blobStream = blob.createWriteStream({
                 resumable: false
             });
@@ -80,7 +73,7 @@ router.route('/uploadImage').post(async (req, res, next) => {
 
 
     } catch (error) {
-        return next(error);
+        res.json(error);
     }
 
 });

@@ -10,22 +10,12 @@ const bodyParser = require('body-parser');
 app.use(cors());
 app.use(express.json());
 
-const port = process.env.PORT || 6000;
+const port = process.env.PORT || 5000;
 
-
-const multerMid = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 10 * 1024 * 1024
-    }
-})
 
 app.disable('x-powered-by');
-app.use(multerMid.single('file'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-
-
 
 
 
@@ -44,9 +34,17 @@ app.use("/user", userRouter);
 app.use("/image", imageRouter);
 app.use("/repo", repoRouter);
 
-
+app.use((err, req, res, next) => {
+    res.status(500).json({
+        error: err,
+        message: 'Internal server error!',
+    })
+    next()
+})
 
 app.listen(port, () => {
     console.log(`Server is running on port: ${port}`);
 });
+
+
 
