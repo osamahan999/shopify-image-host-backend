@@ -1,7 +1,7 @@
 const router = require('express').Router();
 
 const xss = require('xss'); //used for cleaning user input
-const pool = require('../mysqlConnector'); //connection pool
+const pool = require('../config/mysqlConnector'); //connection pool
 
 
 router.route('/deleteRepo').post((req, res) => {
