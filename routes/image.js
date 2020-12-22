@@ -26,45 +26,61 @@ const gc = new Storage({
 
 const filesBucket = gc.bucket(bucketname);
 
-const uploadImage = (file) => new Promise((resolve, reject) => {
+const uploadImage = (async (file) => {
+    new Promise((resolve, reject) => {
 
-    const { originalname, buffer } = file
+        const { originalname, buffer } = file
 
-    const blob = filesBucket.file(originalname.replace(/ /g, "_"))
-    const blobStream = blob.createWriteStream({
-        resumable: false
-    })
-
-    blobStream.on('finish', () => {
-        const publicUrl = format(
-            `https://storage.googleapis.com/${filesBucket.name}/${blob.name}`
-        );
-        console.log(publicUrl);
-        resolve(publicUrl);
-    })
-        .on('error', () => {
-            reject(`Unable to upload image, something went wrong`)
+        const blob = filesBucket.file(originalname.replace(/ /g, "_"))
+        const blobStream = blob.createWriteStream({
+            resumable: false
         })
-        .end(buffer)
 
+        blobStream.on('finish', () => {
+            return "https://storage.googleapis.com/" + filesBucket.name + "/" + blob.name;
 
-}).catch((error) => {
-    reject(`Unable to upload image, something went wrong`);
+            resolve();
+        }).on('error', () => {
+            reject(`Unable to upload image, something went wrong`)
+        }).end(buffer)
+
+    })
 })
+
+
 
 router.route('/uploadImage').post(async (req, res, next) => {
     try {
-        const myFile = req.file
+        const myFile = req.file;
 
-        const imageUrl = await uploadImage(myFile);
+        new Promise((resolve, reject) => {
+            const { originalname, buffer } = myFile;
+            const blob = filesBucket.file(originalname.replace(/ /g, "_"))
+            const blobStream = blob.createWriteStream({
+                resumable: false
+            });
 
-        res.json({
-            message: "Upload was successful",
-            data: imageUrl
-        })
+
+            blobStream.on('finish', () => {
+                const url = "https://storage.googleapis.com/" + filesBucket.name + "/" + blob.name;
+
+                resolve(url);
+            }).on('error', () => {
+                reject(`Unable to upload image, something went wrong`)
+            }).end(buffer)
+
+        }).then((url) => {
+            res.json({
+                message: "upload was successful!",
+                data: url
+            });
+        }).catch((error) => res.json(error));
+
+
+
+
     } catch (error) {
-        next(error);
-        res.status(400).json(error);
+        return next(error);
     }
 
 });
