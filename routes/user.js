@@ -2,7 +2,7 @@ const router = require('express').Router();
 
 const crypto = require('crypto'); //used for generating salt
 const xss = require('xss'); //used for cleaning user input
-const pool = require('../mysqlConnector'); //connection pool
+const pool = require('../config/mysqlConnector'); //connection pool
 
 
 
