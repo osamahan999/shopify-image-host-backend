@@ -59,112 +59,58 @@ router.post('/uploadImages', upload.array('files', 6), async (req, res) => {
         const cleanRepoID = xss(req.body.repoID);
 
 
-        //clean and format tags
-        // let tags = (req.body.tags.split(","));
-        // const cleanTags = tags.map((tag) => xss(tag.trim()));
+
+        const cleanTags = xss(req.body.tags).replace(/\s/g, ""); //clean tags and remove all whitespace
 
         for (let i = 0; i < req.files.length; i++) {
-            // console.log(xss(myFile[i].originalname)); //sanitize file name
+            myFile[i].originalname = xss(myFile[i].originalname); //sanitize file name
 
 
             let jsonImageInfo = await uploadImageToCloud(req.files[i]);
 
 
-            // const cleanUrl = xss(jsonImageInfo.url); // despite it coming from google might as well clean it incase they get breached lmfao
-            // const cleanText = (jsonImageInfo.imageName); //cleaned alrdy
+            const cleanUrl = xss(jsonImageInfo.url); // despite it coming from google might as well clean it incase they get breached lmfao
+            const cleanText = xss(jsonImageInfo.imageName);
+
+            const inputArr = [cleanUrl, cleanText, cleanRepoID, cleanUserUUID, cleanTags];
 
 
 
-            //first we check if user has permissions to add images to repo
-
-            //if they do, then we insert image into image_url table
-
-            //then we get the image id and insert the tags for that image into the db.
-
-            //then we add image to repo
-
-
-            // pool.getConnection((error, connection) => {
-            //     if (error) console.log('Error: ' + error);
-            //     else {
-            //         /**
-            //          * What this does is check if
-            //          * A. The user has permissions to add images to this repo
-            //          * B. If the image url is already posted to this repo. We don't want duplicates for ease of storage i'm on a free plan LOL
-            //          */
-            //         connection.query("SELECT * FROM user_repository_permissions " +
-            //             " WHERE (user_id= (SELECT user_id FROM user WHERE userUUID = ? ) AND repo_id = ?) AND " +
-            //             " (? NOT IN (SELECT url FROM image_url NATURAL JOIN img_in_repo WHERE img_in_repo.repo_id = ?))",
-            //             [cleanUserUUID, cleanRepoID, cleanUrl, cleanRepoID], //input fields, written this way to prevent injection attacks
-            //             (error, results, fields) => {
-
-            //                 if (error) console.log('Error: ' + error);
-
-            //                 else if (results.length == 0) console.log("You don't have permission to do that");
-            //                 else {
-            //                     if (results[0].canUpload) {
-            //                         connection.query("CALL insertImage(?, ?, ?)",
-            //                             [cleanUrl, cleanText, cleanRepoID], (error, results, fields) => {
-            //                                 if (error) console.log('Error: line 90 ' + error);
-            //                                 else {
-
-            //                                     //now insert tags
-            //                                     if (tags.length != 0) {
-
-            //                                         let query = "INSERT IGNORE INTO tag (tag_text, date_created) VALUES (?)";
-            //                                         let values = ", (?)"
-
-            //                                         for (let i = 0; i < cleanTags.length - 1; i++) query += values; //iterate length - 1 b/c we alrdy have the (?)
-            //                                         connection.query(query, cleanTags, (error, results, fields) => {
-            //                                             if (error) console.log('Error: ' + error);
-            //                                             else {
-
-            //                                                 //url is unique per repo so this gives 1 image id
-            //                                                 let getImgID = "(SELECT image_id FROM img_in_repo NATURAL JOIN image_url WHERE image_url.url = ? ))";
-            //                                                 let getTagID = "(SELECT tag_id FROM tag WHERE tag_text = ?)";
-
-            //                                                 let values = ", (" + getImgID + ", " + getTagID + ")";
-
-            //                                                 let query = "INSERT INTO img_has_tag (image_id, tag_id) VALUES (" + getImgID + ", " + getTagID + ")";
-
-            //                                                 let queryInputs = [];
-            //                                                 queryInputs.push(cleanUrl, cleanTags[0]);
-
-            //                                                 for (let i = 1; i < cleanTags.length; i++) {
-            //                                                     query += values; //iterate length - 1 b/c we alrdy have the initial val
-            //                                                     queryInputs.push(cleanUrl, cleanTags[i]);
-            //                                                 }
-
-            //                                                 connection.query(query, queryInputs, (error, results, fields) => {
-            //                                                     if (error) console.log('Error: ' + error);
-            //                                                 })
+            pool.getConnection((error, connection) => {
+                if (error) console.log('Error: ' + error);
+                else {
+                    /**
+                     * What this precedure does is check if
+                     * A. The user has permissions to add images to this repo 
+                     * B. If the image url is already posted to this repo. We don't want duplicates for ease of storage i'm on a free plan LOL
+                     * C. Adds image to image_url if does not exist
+                     * D. Adds img_in_repo 
+                     * E1. Checks to see if each tag is in the database -> if so, gets tag and adds to img_has_tag
+                     * E2. If tag nonexistant, adds it to tag table and then adds new tag id and img id to img_has_tag
+                     * F. Checks if any errors occured; if so, rollback: else, we're good!
+                     */
 
 
-            //                                             }
-            //                                         })
-            //                                     }
-            //                                 }
-            //                             }
-            //                         )
+                    connection.query("CALL d9794gvvb8r68jpf.insertImage(?, ?, ?, ?, ?)", inputArr,
+                        (error, results, fields) => {
+                            if (error) console.log('Error: ' + error);
+                            else {
+                                console.log(results);
+                            }
+                        })
+                }
 
 
-            //                     } else {
-            //                         console.log("You do not have permissions to do that");
-            //                     }
+                connection.release();
 
-            //                 }
-
-            //             })
-            //     }
-
-
-            //     connection.release();
-
-            // })
+            })
 
             imageUrls.push(jsonImageInfo);
 
         }
+
+
+        //TODO: clear uploads folder
 
 
         res.json(imageUrls);
