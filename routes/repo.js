@@ -107,11 +107,11 @@ router.route('/getRepoImagesFiltered').get((req, res) => {
             let wildCardSearch = "";
 
             if (tagsArray.length != 0) {
-                query += " AND ( ((tag.tag_text LIKE CONCAT('%', ?, '%') AND tag.tag_text != '' AND tag.tag_text IS NOT NULL))  ";
+                query += " AND ( (tag.tag_text LIKE CONCAT('%', ?, '%'))  ";
                 inputs.push(tagsArray[0]);
 
                 for (let i = 1; i < tagsArray.length; i++) {
-                    wildCardSearch += " OR ((tag.tag_text LIKE CONCAT('%', ?, '%') AND tag.tag_text != '' AND tag.tag_text IS NOT NULL))  ";
+                    wildCardSearch += " OR (tag.tag_text LIKE CONCAT('%', ?, '%')  ";
                     inputs.push(tagsArray[i]);
                 }
                 query += ")"
