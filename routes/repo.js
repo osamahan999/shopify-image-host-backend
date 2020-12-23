@@ -4,6 +4,10 @@ const xss = require('xss'); //used for cleaning user input
 const pool = require('../config/mysqlConnector'); //connection pool
 
 
+
+
+
+
 router.route('/deleteRepo').post((req, res) => {
 
     const cleanUserUUID = xss(req.body.userUUID);
@@ -63,8 +67,28 @@ router.route('/getRepos').get((req, res) => {
         connection.release();
 
     })
+})
 
+router.route('/getRepoImages').get((req, res) => {
+    const cleanRepoId = xss(req.query.repoID);
 
+    pool.getConnection((error, connection) => {
+        if (error) res.status(400).json("Error: " + error);
+        else {
+
+            connection.query("CALL getRepoImages(?)",
+                cleanRepoId, (error, results, fields) => {
+                    if (error) res.status(400).json('Error: ' + error);
+                    else {
+                        console.log(results);
+                        res.json(results[0]);
+                    }
+                })
+        }
+
+        connection.release();
+
+    })
 })
 
 
