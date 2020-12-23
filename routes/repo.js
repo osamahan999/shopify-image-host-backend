@@ -80,10 +80,54 @@ router.route('/getRepoImages').get((req, res) => {
                 cleanRepoId, (error, results, fields) => {
                     if (error) res.status(400).json('Error: ' + error);
                     else {
-                        console.log(results);
-                        res.json(results[0]);
+                        if (results[0].length == undefined) res.json([results[0]]);
+                        else res.json(results[0]);
                     }
                 })
+        }
+
+        connection.release();
+
+    })
+})
+
+router.route('/getRepoImagesFiltered').get((req, res) => {
+    const cleanRepoID = xss(req.query.repoID);
+    const cleanTags = xss(req.query.tags).replace(/\s/g, ""); //clean tags and remove all whitespace
+    const tagsArray = cleanTags.split(",");
+    let inputs = [cleanRepoID];
+
+    pool.getConnection((error, connection) => {
+        if (error) res.status(400).json("Error: " + error);
+        else {
+
+            let query = "SELECT image_url.url, image_url.image_text AS title, tag.tag_text AS tags FROM image_url " +
+                "NATURAL JOIN img_in_repo NATURAL JOIN img_has_tag NATURAL JOIN tag " +
+                "WHERE (img_in_repo.repo_id = ?) AND (image_url.url IS NOT NULL AND image_url.url != '')";
+            let wildCardSearch = "";
+
+            if (tagsArray.length != 0) {
+                query += " AND ( ((tag.tag_text LIKE CONCAT('%', ?, '%') AND tag.tag_text != '' AND tag.tag_text IS NOT NULL))  ";
+                inputs.push(tagsArray[0]);
+
+                for (let i = 1; i < tagsArray.length; i++) {
+                    wildCardSearch += " OR ((tag.tag_text LIKE CONCAT('%', ?, '%') AND tag.tag_text != '' AND tag.tag_text IS NOT NULL))  ";
+                    inputs.push(tagsArray[i]);
+                }
+                query += ")"
+            }
+
+            query = query + wildCardSearch + " GROUP BY image_url.image_id ORDER BY  image_url.date_uploaded";
+
+
+            connection.query(query, inputs, (error, results, field) => {
+                if (error) res.status(400).json('Error: ' + error);
+                else {
+                    res.json(results);
+
+                }
+            })
+
         }
 
         connection.release();
@@ -138,13 +182,15 @@ router.route('/newRepo').post((req, res) => {
                                             else res.json("Success");
                                         })
                                 }
-                                connection.release();
 
                             })
                     }
                 })
 
         })
+
+        connection.release();
+
     }
 });
 
