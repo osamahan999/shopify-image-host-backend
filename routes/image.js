@@ -37,9 +37,75 @@ var storage = multer.diskStorage({
     }
 });
 
+
+
+
+router.post('/deleteImageFromRepo', (req, res) => {
+    const cleanUserUUID = xss(req.body.userUUID);
+    const cleanRepoId = xss(req.body.repoId);
+
+    const imagesToRemove = req.body.imagesToRemove;
+    if (imagesToRemove.length == 0) res.status(400).json("No images selected");
+    else {
+
+
+        var imageIdsToDelete = [];
+
+        for (var i = 0; i < imagesToRemove.length; i++) {
+            imageIdsToDelete.push(xss(imagesToRemove[i]));
+        }
+
+        pool.getConnection((error, connection) => {
+            if (error) res.status(400).json('Error: ' + error);
+            else {
+                /**
+                 * Check if user is in this repo
+                 */
+
+                connection.query("SELECT * FROM user_repository_permissions " +
+                    "WHERE user_id = (SELECT user_id FROM user WHERE user.userUUID = ?) AND repo_id = ?", [cleanUserUUID, cleanRepoId],
+                    (error, results, fields) => {
+                        if (error) res.status(400).json('Error');
+                        else {
+                            if (results[0].canDeleteImg == 1) { //if can delete
+                                let inputs = [cleanRepoId];
+                                inputs.push(imageIdsToDelete[0]);
+                                let query = "DELETE FROM img_in_repo WHERE ( repo_id = ? ) AND (image_id IN (? ";
+
+                                for (let i = 1; i < imageIdsToDelete.length; i++) {
+                                    inputs.push(imageIdsToDelete[i]);
+                                    query += ", ?"
+                                }
+                                query += "))"
+
+
+                                connection.query(query, inputs, (error, results, fields) => {
+                                    if (error) res.status(400).json(error);
+                                    else {
+                                        res.json("removed");
+                                    }
+                                })
+                            } else res.status(400).json("You dont have permissions to do that");
+                        }
+                    })
+            }
+
+
+            connection.release();
+
+        })
+    }
+
+})
+
+
+
+
+
+
+
+
 const upload = multer({ storage });
-
-
 /**
  * routes to /uploadImages, and uploads up to 20 files at once. async of course
  * Calls uploadImageToCloud on each image, to upload to google cloud 
