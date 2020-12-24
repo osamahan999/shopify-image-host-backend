@@ -91,6 +91,9 @@ router.route('/getRepoImages').get((req, res) => {
     })
 })
 
+/**
+ * The procedure from getRepos, except I am building the query based on however many tags are input.
+ */
 router.route('/getRepoImagesFiltered').get((req, res) => {
     const cleanRepoID = xss(req.query.repoID);
     const cleanTags = xss(req.query.tags).replace(/\s/g, ""); //clean tags and remove all whitespace
@@ -117,7 +120,7 @@ router.route('/getRepoImagesFiltered').get((req, res) => {
                 query += ")"
             }
 
-            query = query + wildCardSearch + " GROUP BY image_url.image_id ORDER BY  image_url.date_uploaded";
+            query = query + wildCardSearch + " GROUP BY image_url.image_id ORDER BY image_url.date_uploaded DESC";
 
 
             connection.query(query, inputs, (error, results, field) => {
@@ -151,47 +154,31 @@ router.route('/newRepo').post((req, res) => {
     const cleanRepoName = xss(req.body.repoName);
     const cleanPublicRepo = xss(req.body.publicRepo);
 
-    if (cleanUserUUID.length < 1 || cleanRepoName.length < 1) res.status(400).json("Invalid input");
+
+    if (cleanUserUUID.length < 1 || cleanRepoName.length < 1) res.json("failed");
     else {
+        //doing this in case of bad input
         var public = false;
         if (cleanPublicRepo == true) public = true;
         //gets connection from pool
         pool.getConnection((error, connection) => {
-            if (error) res.status(400).json('Error: ' + error);
+            if (error) console.log('Error: ' + error);
+            else {
+                connection.query("CALL newRepo(?, ?, ?)", [cleanUserUUID, cleanRepoName, cleanPublicRepo],
+                    (error, results, fields) => {
+                        if (error) res.status(400).json(error);
+                        else res.json("Success!");
+                    })
+            }
 
-            connection.query("SELECT * FROM repository WHERE owner_id = (SELECT user_id FROM user WHERE userUUID = ?) AND name = ?", [cleanUserUUID, cleanRepoName],
-                (error, results, fields) => {
-                    if (error) res.status(400).json('Error: ' + error);
-                    else if (results.length > 0) {
-                        res.status(400).json("Error: this exact repo already exists!");
-                    } else {
-                        connection.query("INSERT INTO repository (owner_id, date_created, name, public)" +
-                            " VALUES ((SELECT user_id FROM user WHERE userUUID = ?), now(), ?, ? )",
-                            [cleanUserUUID, cleanRepoName, public], (error, results, fields) => {
-
-                                if (error) res.status(400).json('Error: ' + error);
-
-                                //if unique
-                                else {
-                                    connection.query("INSERT INTO user_repository_permissions " +
-                                        "(user_id, isOwner, canUpload, canDeleteImg, canRenameRepo, canDeleteRepo, repo_id)" +
-                                        " VALUES ((SELECT user_id FROM user WHERE userUUID = ?), 1, 1, 1, 1, 1, (SELECT repo_id FROM repository WHERE owner_id = " +
-                                        "(SELECT user_id FROM user WHERE userUUID = ?) AND name = ?))", [cleanUserUUID, cleanUserUUID, cleanRepoName], (error, results, fields) => {
-
-                                            if (error) res.status(400).json('Error: ' + error);
-                                            else res.json("Success");
-                                        })
-                                }
-
-                            })
-                    }
-                })
+            connection.release();
 
         })
 
-        connection.release();
 
     }
+
+
 });
 
 
