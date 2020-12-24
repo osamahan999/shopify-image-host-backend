@@ -72,13 +72,14 @@ router.route('/getRepos').get((req, res) => {
 
 router.route('/getRepoImages').get((req, res) => {
     const cleanRepoId = xss(req.query.repoID);
+    const cleanUserUUID = xss(req.query.userUUID);
 
     pool.getConnection((error, connection) => {
         if (error) res.status(400).json("Error: " + error);
         else {
 
-            connection.query("CALL getRepoImages(?)",
-                cleanRepoId, (error, results, fields) => {
+            connection.query("CALL getRepoImages(?, ?)",
+                [cleanRepoId, cleanUserUUID], (error, results, fields) => {
                     if (error) res.status(400).json('Error: ' + error);
                     else {
                         if (results[0].length == undefined) res.json([results[0]]);
@@ -97,6 +98,8 @@ router.route('/getRepoImages').get((req, res) => {
  */
 router.route('/getRepoImagesFiltered').get((req, res) => {
     const cleanRepoID = xss(req.query.repoID);
+    const cleanUserUUID = xss(req.query.userUUID);
+
     const cleanTags = xss(req.query.tags).replace(/\s/g, ""); //clean tags and remove all whitespace
     const tagsArray = cleanTags.split(",");
     let inputs = [cleanRepoID];
@@ -105,32 +108,41 @@ router.route('/getRepoImagesFiltered').get((req, res) => {
         if (error) res.status(400).json("Error: " + error);
         else {
 
-            let query = "SELECT image_url.url, image_url.image_text AS title, tag.tag_text AS tags FROM image_url " +
-                "NATURAL JOIN img_in_repo NATURAL JOIN img_has_tag NATURAL JOIN tag " +
-                "WHERE (img_in_repo.repo_id = ?) AND (image_url.url IS NOT NULL AND image_url.url != '')";
-            let wildCardSearch = "";
+            connection.query("SELECT COUNT(*) AS 'rows' FROM user_repository_permissions WHERE user_id = (SELECT user_id FROM user WHERE (user.userUUID = ?) AND repo_id = ?)",
+                [cleanUserUUID, cleanRepoID], (error, results, field) => {
+                    if (error) res.status(400).json("Error: " + error);
+                    else {
+                        if (results[0].rows > 0) {
+                            let query = "SELECT image_url.url, image_url.image_id, image_url.image_text AS title, tag.tag_text AS tags FROM image_url " +
+                                "NATURAL JOIN img_in_repo NATURAL JOIN img_has_tag NATURAL JOIN tag " +
+                                "WHERE (img_in_repo.repo_id = ?) AND (image_url.url IS NOT NULL AND image_url.url != '')";
+                            let wildCardSearch = "";
 
-            if (tagsArray.length != 0) {
-                query += " AND ( (tag.tag_text LIKE CONCAT('%', ?, '%'))  ";
-                inputs.push(tagsArray[0]);
+                            if (tagsArray.length != 0) {
+                                query += " AND ( (tag.tag_text LIKE CONCAT('%', ?, '%'))  ";
+                                inputs.push(tagsArray[0]);
 
-                for (let i = 1; i < tagsArray.length; i++) {
-                    wildCardSearch += " OR (tag.tag_text LIKE CONCAT('%', ?, '%')  ";
-                    inputs.push(tagsArray[i]);
+                                for (let i = 1; i < tagsArray.length; i++) {
+                                    wildCardSearch += " OR (tag.tag_text LIKE CONCAT('%', ?, '%')  ";
+                                    inputs.push(tagsArray[i]);
+                                }
+                                query += ")"
+                            }
+
+                            query = query + wildCardSearch + " GROUP BY image_url.image_id ORDER BY image_url.date_uploaded DESC";
+
+
+                            connection.query(query, inputs, (error, results, field) => {
+                                if (error) res.status(400).json('Error: ' + error);
+                                else {
+                                    res.json(results);
+
+                                }
+                            })
+                        }
+                    }
                 }
-                query += ")"
-            }
-
-            query = query + wildCardSearch + " GROUP BY image_url.image_id ORDER BY image_url.date_uploaded DESC";
-
-
-            connection.query(query, inputs, (error, results, field) => {
-                if (error) res.status(400).json('Error: ' + error);
-                else {
-                    res.json(results);
-
-                }
-            })
+            )
 
         }
 
