@@ -113,9 +113,11 @@ router.route('/userRegister').post((req, res) => {
                 } else {
                     res.status(400).json("Not Unique");
                 }
-                connection.release();
 
             })
+
+            connection.release();
+
         })
     }
 });

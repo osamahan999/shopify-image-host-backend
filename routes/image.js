@@ -4,9 +4,8 @@ const Cloud = require('@google-cloud/storage');
 const path = require("path");
 const util = require('util')
 const xss = require('xss'); //used for cleaning user input
-
+const multer = require('multer');
 var fs = require('fs');
-
 const pool = require('../config/mysqlConnector'); //connection pool
 const mkdirp = require("mkdirp");
 
@@ -15,11 +14,6 @@ const serviceKey = path.join(__dirname, '../config/key.json');
 const bucketname = 'shopify-image-repo-bucket';
 
 const { Storage } = Cloud
-
-const multer = require('multer');
-const { createConnection } = require('net');
-const { clearInterval } = require('timers');
-const { readFileSync } = require('fs');
 
 const gc = new Storage({
     keyFilename: 'config/key.json',
@@ -47,9 +41,10 @@ const upload = multer({ storage });
 
 
 /**
- * routes to /uploadImages, and uploads up to 6 files at once. async of course
+ * routes to /uploadImages, and uploads up to 20 files at once. async of course
+ * Calls uploadImageToCloud on each image, to upload to google cloud 
  */
-router.post('/uploadImages', upload.array('files', 6), async (req, res) => {
+router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
     try {
 
         const myFile = req.files;
