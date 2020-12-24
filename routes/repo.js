@@ -57,7 +57,8 @@ router.route('/getRepos').get((req, res) => {
         else {
 
 
-            connection.query("SELECT name, repo_id FROM repository WHERE (owner_id = (SELECT user_id FROM user WHERE userUUID = ?)) ORDER BY date_created DESC",
+            connection.query("SELECT name, repo_id FROM repository NATURAL JOIN user_repository_permissions " +
+                "WHERE (user_repository_permissions.user_id = (SELECT user_id FROM user WHERE user.userUUID = ?)) ORDER BY date_created DESC",
                 cleanUserUUID, (error, results, fields) => {
                     if (error) res.status(400).json('Error: ' + error);
                     else res.json(results);
@@ -158,13 +159,13 @@ router.route('/newRepo').post((req, res) => {
     if (cleanUserUUID.length < 1 || cleanRepoName.length < 1) res.json("failed");
     else {
         //doing this in case of bad input
-        var public = false;
-        if (cleanPublicRepo == true) public = true;
+        var public = 0;
+        if (cleanPublicRepo == 'true') public = 1;
         //gets connection from pool
         pool.getConnection((error, connection) => {
             if (error) console.log('Error: ' + error);
             else {
-                connection.query("CALL newRepo(?, ?, ?)", [cleanUserUUID, cleanRepoName, cleanPublicRepo],
+                connection.query("CALL newRepo(?, ?, ?)", [cleanUserUUID, cleanRepoName, public],
                     (error, results, fields) => {
                         if (error) res.status(400).json(error);
                         else res.json("Success!");
