@@ -3,7 +3,6 @@ const app = express();
 const cors = require("cors");
 
 
-const multer = require('multer');
 const bodyParser = require('body-parser');
 
 
@@ -28,11 +27,12 @@ var pool = require('./config/mysqlConnector');
 const userRouter = require("./routes/user");
 const imageRouter = require("./routes/image");
 const repoRouter = require("./routes/repo");
-
+const repoInvitesRouter = require("./routes/repoInvites");
 
 app.use("/user", userRouter);
 app.use("/image", imageRouter);
 app.use("/repo", repoRouter);
+app.use("/repoInvite", repoInvitesRouter);
 
 app.use((err, req, res, next) => {
     res.status(500).json({

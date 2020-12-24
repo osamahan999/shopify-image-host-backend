@@ -3,6 +3,11 @@ const xss = require('xss'); //used for cleaning user input
 const pool = require('../config/mysqlConnector'); //connection pool
 
 
+/**
+ * Gets all the invites a user has
+ * 
+ * @param {String} userUUID
+ */
 router.route('/getInvites').get((req, res) => {
     const cleanUserUUID = xss(req.query.userUUID);
 
@@ -23,7 +28,17 @@ router.route('/getInvites').get((req, res) => {
     })
 })
 
-
+/**
+ * Invites a specified username to a specified repo IF inviter is owner
+ * 
+ * @param {String} userUUID //the inviter
+ * @param {Integer} repoId
+ * @param {String} username //the invited
+ * @param {Boolean} canUpload
+ * @param {Boolean} canDeleteImg
+ * @param {Boolean} canRenameRepo
+ * @param {Boolean} canDeleteRepo
+ */
 router.route('/inviteUser').post((req, res) => {
 
     //remove xss attack possibility
