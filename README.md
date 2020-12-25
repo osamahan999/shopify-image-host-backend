@@ -1,29 +1,28 @@
+Frontend repository with a much more indepth readme about the project @https://github.com/osamahan999/shopify-image-host-frontend
+
 To run this, you must either: 
-Simply navigate to the hosted version @putlinkhere 
+Simply navigate to the hosted version @https://shopifyimagerepofrontend.uc.r.appspot.com/ 
+
 
 or set up on your own machine by following these steps: 
 
 1. Clone the repo from my github 
-2. remove all node modules 
-3. npm init 
-4. npm install express 
-5. npm install xss 
-6. npm install @google-cloud/storage 
-7. npm install mysql 
-8. npm install body-parser 
-9. npm install --save multer 
-10. Set up a google cloud bucket and fill in the bucket info in repo.js 
-11. Link your key.json file to the correct import in repo.js 
-12. Set up a mysqlConnection file which simply specifies a connection pool using whatever hosting service you're using 
+2. remove all node modules if they give you any trouble and do the following:
+    1. npm init 
+    2. npm install express 
+    3. npm install xss 
+    4. npm install @google-cloud/storage 
+    5. npm install mysql 
+    6. npm install body-parser 
+    7. npm install --save multer 
+    8. Set up a google cloud bucket and fill in the bucket info in repo.js 
+    9. Link your key.json file to the correct import in repo.js 
+    10. Set up a mysqlConnection file which simply specifies a connection pool using whatever hosting service you're using 
+3. If backend runs fine, then no need to remove the node modules.
+4. Set up a google cloud bucket for your images
+5. Set up a heroku MySQL database
+6. Import my database schemas and procedures from the databaseSchema folder
+7. Set up the frontend and point the http requests towards your local host
 
-13. Clone my frontend repo, follow the readme, and change all http requests to your host
 
 
-
-
-Some issues I need to work on: 
-1. Make it such that duplicate URLs do not simply get reinputted into the db, but instead 
-are pulled and referenced to, and that only img_in_repo table has new values inserted 
-2. Sometimes the cloud server simply does not work? Throws a 500 code and I have no clue why. My best guess is 
-the free plan assumes you won't use it often, and so I get the connection turned off to save them costs? 
-3. Sometimes the sql server turns off, and takes a bit for the connection to reconnect. Again, free plan :( 
