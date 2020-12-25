@@ -34,12 +34,19 @@ app.use("/image", imageRouter);
 app.use("/repo", repoRouter);
 app.use("/repoInvite", repoInvitesRouter);
 
+
+
 app.use((err, req, res, next) => {
     res.status(500).json({
         error: err,
         message: 'Internal server error!',
     })
     next()
+})
+
+
+app.get('/', (req, res) => {
+    res.send("Deployed");
 })
 
 app.listen(port, () => {
