@@ -5,32 +5,57 @@ const pool = require('../config/mysqlConnector'); //connection pool
 
 
 
+router.route('/renameRepo').post((req, res) => {
+    const cleanUserUUID = xss(req.body.userUUID);
+    const cleanRepoId = xss(req.body.repoId);
+    const cleanNewRepoName = xss(req.body.newRepoName);
+
+    pool.getConnection((error, connection) => {
+        if (error) res.status.json("Error connecting");
+        else {
+
+            connection.query("CALL renameRepo(?, ?, ?)",
+                [cleanUserUUID, cleanRepoId, cleanNewRepoName],
+                (error, results, fields) => {
+                    if (error) res.status(400).json(error);
+                    else {
+                        res.json(results);
+                    }
+                });
+        }
+    })
+
+
+})
 
 
 
+
+
+/**
+ * Checks if user in the repo or if they can even delete
+ * If so, removes repo and deletes all user permissions for that repo
+ */
 router.route('/deleteRepo').post((req, res) => {
 
     const cleanUserUUID = xss(req.body.userUUID);
     const cleanRepoID = xss(req.body.repoID);
 
+
     pool.getConnection((error, connection) => {
         if (error) res.status(400).json("Error: " + error);
         else {
-            connection.query("SELECT * FROM user_repository_permissions WHERE repo_id = ? AND user_id = (SELECT user_id FROM user WHERE userUUID = ? )",
+            connection.query("SELECT * FROM user_repository_permissions WHERE (repo_id = ?) AND (user_id = (SELECT user_id FROM user WHERE user.userUUID = ?) )",
                 [cleanRepoID, cleanUserUUID],
                 (error, results, fields) => {
                     if (error) res.status(400).json('Error: ' + error);
                     else {
                         if (results[0].canDeleteRepo) {
+                            //only removing people's permissions because i want to keep their data
                             connection.query("DELETE FROM user_repository_permissions WHERE repo_id = ?", [cleanRepoID], (error, results, fields) => {
                                 if (error) res.status(400).json('Error: ' + error);
                                 else {
-                                    connection.query("DELETE FROM repository WHERE repo_id = ?  ", [cleanRepoID], (error, results, fields) => {
-                                        if (error) res.status(400).json('Error: ' + error);
-                                        else {
-                                            res.json("Successfully deleted");
-                                        }
-                                    })
+                                    res.json("Repo deleted");
                                 }
                             })
                         } else {

@@ -47,10 +47,10 @@ router.route('/inviteUser').post((req, res) => {
     const cleanUserName = xss(req.body.username); //username of the invited
 
     //Not checking if they are booleans; if error, transaction will fail in procedure b/c expecting tinyint(1)
-    const cleanCanUpload = xss(req.body.canUpload);
-    const cleanCanDeleteImg = xss(req.body.canDeleteImg);
-    const cleanCanRenameRepo = xss(req.body.canRenameRepo);
-    const cleanCanDeleteRepo = xss(req.body.canDeleteRepo);
+    const cleanCanUpload = (xss(req.body.canUpload) == 'true' ? 1 : 0);
+    const cleanCanDeleteImg = xss(req.body.canDeleteImg) == 'true' ? 1 : 0;
+    const cleanCanRenameRepo = xss(req.body.canRenameRepo) == 'true' ? 1 : 0;
+    const cleanCanDeleteRepo = xss(req.body.canDeleteRepo) == 'true' ? 1 : 0;
 
     /**
      * First check if repo is public and if inviter is owner
@@ -63,6 +63,7 @@ router.route('/inviteUser').post((req, res) => {
      */
 
     let inputs = [cleanUserUUID, cleanUserName, cleanRepoId, cleanCanUpload, cleanCanDeleteImg, cleanCanRenameRepo, cleanCanDeleteRepo];
+
 
     pool.getConnection((error, connection) => {
         if (error) console.log('Error: ' + error);
