@@ -9,7 +9,6 @@ var fs = require('fs');
 const pool = require('../config/mysqlConnector'); //connection pool
 const mkdirp = require("mkdirp");
 
-
 const serviceKey = path.join(__dirname, '../config/key.json');
 const bucketname = 'shopify-image-repo-bucket';
 
@@ -154,16 +153,18 @@ router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
 
                     connection.query("CALL d9794gvvb8r68jpf.insertImage(?, ?, ?, ?, ?)", inputArr,
                         (error, results, fields) => {
-                            if (error) console.log('Error: ' + error);
+                            if (error) res.status(400).json('Error: ' + error);
                             else {
-                                console.log(results);
+
+                                res.json("Success");
+
                             }
                         })
                 }
 
 
-                connection.release();
 
+                connection.release();
             })
 
             imageUrls.push(jsonImageInfo);
@@ -171,17 +172,18 @@ router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
         }
 
 
-        //TODO: clear uploads folder
-
-
-        res.json(imageUrls);
-
 
     } catch (error) {
         res.json(error);
     }
 
+    //TODO: delete upload folder but might not be an issue when hosted on cloud
+
+
+
 });
+
+
 
 
 
