@@ -14,6 +14,7 @@ const bucketname = 'shopify-image-repo-bucket';
 
 const { Storage } = Cloud
 
+//Used to specify to google cloud what bucket I am accessing
 const gc = new Storage({
     keyFilename: 'config/key.json',
     projectId: 'shopifyimagerepo'
@@ -21,6 +22,7 @@ const gc = new Storage({
 const filesBucket = gc.bucket(bucketname);
 
 
+//Used to specify to my requests where to store the files sent to me locally, such that I can authenticate and send them to google cloud
 var storage = multer.diskStorage({
     destination: function (_req, file, done) {
         const tag = file.originalname.split("-");
@@ -38,7 +40,12 @@ var storage = multer.diskStorage({
 
 
 
-
+/**
+ * 
+ * @param {String} userUUID
+ * @param {Int} repoId
+ * @param {Array<Int>} imagesToRemove
+ */
 router.post('/deleteImageFromRepo', (req, res) => {
     const cleanUserUUID = xss(req.body.userUUID);
     const cleanRepoId = xss(req.body.repoId);
@@ -48,11 +55,12 @@ router.post('/deleteImageFromRepo', (req, res) => {
     else {
 
 
+        //Authenticate all the image ids inputted
         var imageIdsToDelete = [];
-
         for (var i = 0; i < imagesToRemove.length; i++) {
             imageIdsToDelete.push(xss(imagesToRemove[i]));
         }
+
 
         pool.getConnection((error, connection) => {
             if (error) res.status(400).json('Error: ' + error);
@@ -66,11 +74,17 @@ router.post('/deleteImageFromRepo', (req, res) => {
                     (error, results, fields) => {
                         if (error) res.status(400).json('Error');
                         else {
-                            if (results[0].canDeleteImg == 1) { //if can delete
+
+                            if (results.length != 1) res.status(400).json("Unexcepted error encountered");
+                            else if (results[0].canDeleteImg == 1) { //if can delete
+
+                                //initialize with repoId and the first image id. Then, we iterate through the ids and build a 
+                                //query to remove all the images
                                 let inputs = [cleanRepoId];
                                 inputs.push(imageIdsToDelete[0]);
-                                let query = "DELETE FROM img_in_repo WHERE ( repo_id = ? ) AND (image_id IN (? ";
 
+
+                                let query = "DELETE FROM img_in_repo WHERE ( repo_id = ? ) AND (image_id IN (? ";
                                 for (let i = 1; i < imageIdsToDelete.length; i++) {
                                     inputs.push(imageIdsToDelete[i]);
                                     query += ", ?"
@@ -79,7 +93,7 @@ router.post('/deleteImageFromRepo', (req, res) => {
 
 
                                 connection.query(query, inputs, (error, results, fields) => {
-                                    if (error) res.status(400).json(error);
+                                    if (error) res.status(400).json("Error occured while deleting");
                                     else {
                                         res.json("removed");
                                     }
@@ -103,11 +117,19 @@ router.post('/deleteImageFromRepo', (req, res) => {
 
 
 
-
+//Utilizes the storage method we initialized earlier in the file
 const upload = multer({ storage });
+
+
 /**
  * routes to /uploadImages, and uploads up to 20 files at once. async of course
  * Calls uploadImageToCloud on each image, to upload to google cloud 
+ * 
+ * 
+ * @param {String} userUUID
+ * @param {Int} repoId
+ * @param {Array<File>} files
+ * @param {Array<String>} tags
  */
 router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
     try {
@@ -119,37 +141,36 @@ router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
         const cleanRepoID = xss(req.body.repoID);
 
 
-
+        //I remove the white space because I don't want a tag like 'dog' and 'do g' to be two different tags.
         const cleanTags = xss(req.body.tags).replace(/\s/g, ""); //clean tags and remove all whitespace
 
-        for (let i = 0; i < req.files.length; i++) {
-            myFile[i].originalname = xss(myFile[i].originalname); //sanitize file name
+        pool.getConnection(async (error, connection) => {
+            if (error) console.log("Error connecting to database");
+            else {
+                /**
+                 * What this precedure does is check if
+                 * A. The user has permissions to add images to this repo 
+                 * B. If the image url is already posted to this repo. We don't want duplicates for ease of storage i'm on a free plan LOL
+                 * C. Adds image to image_url if does not exist
+                 * D. Adds img_in_repo 
+                 * E1. Checks to see if each tag is in the database -> if so, gets tag and adds to img_has_tag
+                 * E2. If tag nonexistant, adds it to tag table and then adds new tag id and img id to img_has_tag
+                 * F. Checks if any errors occured; if so, rollback: else, we're good!
+                 */
 
 
-            let jsonImageInfo = await uploadImageToCloud(req.files[i]);
+                //Iterate through each file, clean the original name from xss, and upload it. 
+                for (let i = 0; i < req.files.length; i++) {
+                    myFile[i].originalname = xss(myFile[i].originalname); //sanitize file name
 
 
-            const cleanUrl = xss(jsonImageInfo.url); // despite it coming from google might as well clean it incase they get breached lmfao
-            const cleanText = xss(jsonImageInfo.imageName);
-
-            const inputArr = [cleanUrl, cleanText, cleanRepoID, cleanUserUUID, cleanTags];
+                    let jsonImageInfo = await uploadImageToCloud(req.files[i]);
 
 
+                    const cleanUrl = xss(jsonImageInfo.url); // despite it coming from google might as well clean it incase they get breached lmfao
+                    const cleanText = xss(jsonImageInfo.imageName);
 
-            pool.getConnection((error, connection) => {
-                if (error) console.log('Error: ' + error);
-                else {
-                    /**
-                     * What this precedure does is check if
-                     * A. The user has permissions to add images to this repo 
-                     * B. If the image url is already posted to this repo. We don't want duplicates for ease of storage i'm on a free plan LOL
-                     * C. Adds image to image_url if does not exist
-                     * D. Adds img_in_repo 
-                     * E1. Checks to see if each tag is in the database -> if so, gets tag and adds to img_has_tag
-                     * E2. If tag nonexistant, adds it to tag table and then adds new tag id and img id to img_has_tag
-                     * F. Checks if any errors occured; if so, rollback: else, we're good!
-                     */
-
+                    const inputArr = [cleanUrl, cleanText, cleanRepoID, cleanUserUUID, cleanTags];
 
                     connection.query("CALL d9794gvvb8r68jpf.insertImage(?, ?, ?, ?, ?)", inputArr,
                         (error, results, fields) => {
@@ -160,16 +181,16 @@ router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
 
                             }
                         })
+
+                    imageUrls.push(jsonImageInfo);
+
                 }
 
-
-
                 connection.release();
-            })
 
-            imageUrls.push(jsonImageInfo);
+            }
 
-        }
+        })
 
 
 
