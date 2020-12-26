@@ -40,11 +40,11 @@ router.route('/userLogIn').post((req, res) => {
         connection.query("SELECT salt, password, userUUID FROM user WHERE username = ?",
             cleanUserName, //input fields, written this way to prevent injection attacks
             (error, results, fields) => {
-                if (error) res.status(400).json('Error: ' + error);
+                if (error) res.status(400).json("Log in failed");
 
-                if (results.length == 0) res.status(400).json("Failed Log In");
+                if (results.length == 0) res.status(400).json("Check your log in information");
                 else if (results[0].password == hash(results[0].salt, cleanPassword)) res.json({ userUUID: results[0].userUUID });
-                else res.status(400).json('Error: ' + error);
+                else res.status(400).json("Check your log in information");
 
             })
 
@@ -62,8 +62,8 @@ router.route('/userLogIn').post((req, res) => {
  * @param {String} username
  * @param {String} password
  * @param {String} email
- * @param {String} firstName //OPTIONAL
- * @param {String} lastName //OPTIONAL  TODO FIX 
+ * @param {String} firstName 
+ * @param {String} lastName  
  */
 router.route('/userRegister').post((req, res) => {
 
@@ -88,33 +88,34 @@ router.route('/userRegister').post((req, res) => {
         //gets connection from pool
         pool.getConnection((error, connection) => {
             if (error) res.status(400).json('Error: ' + error);
+            else {
+                //check for unique username
+                connection.query("SELECT * FROM user WHERE username = ?", cleanUserName, (error, results, fields) => {
 
-            //check for unique username
-            connection.query("SELECT * FROM user WHERE username = ?", cleanUserName, (error, results, fields) => {
+                    if (error) res.status(400).json('Error: ' + error);
 
-                if (error) res.status(400).json('Error: ' + error);
+                    //if unique
+                    else if (results.length == 0) {
 
-                //if unique
-                else if (results.length == 0) {
+                        var insertQuery = "INSERT INTO user (first_name, last_name, email, username, password, date_created, salt, userUUID) " +
+                            "VALUES (? , ? , ? , ? , ? , NOW() , ?, ? )";
 
-                    var insertQuery = "INSERT INTO user (first_name, last_name, email, username, password, date_created, salt, userUUID) " +
-                        "VALUES (? , ? , ? , ? , ? , NOW() , ?, ? )";
+                        connection.query(insertQuery,
+                            [cleanFirstName, cleanLastName, cleanEmail, cleanUserName, hashedPassword, salt, userUUID],
+                            (error, results, fields) => {
+                                if (error)
+                                    res.status(400).json('Error: ' + error);
 
-                    connection.query(insertQuery,
-                        [cleanFirstName, cleanLastName, cleanEmail, cleanUserName, hashedPassword, salt, userUUID],
-                        (error, results, fields) => {
-                            if (error)
-                                res.status(400).json('Error: ' + error);
-
-                            res.json("Successful register");
-                        })
+                                res.json("Successful register");
+                            })
 
 
-                } else {
-                    res.status(400).json("Not Unique");
-                }
+                    } else {
+                        res.status(400).json("Not Unique");
+                    }
 
-            })
+                })
+            }
 
             connection.release();
 

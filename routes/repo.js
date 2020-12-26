@@ -5,6 +5,13 @@ const pool = require('../config/mysqlConnector'); //connection pool
 
 
 
+/**
+ * Renames repo if individual making the request has the correct permissions
+ * 
+ * @param {String} userUUID
+ * @param {Int} repoId
+ * @param {String} newRepoName
+ */
 router.route('/renameRepo').post((req, res) => {
     const cleanUserUUID = xss(req.body.userUUID);
     const cleanRepoId = xss(req.body.repoId);
@@ -17,9 +24,9 @@ router.route('/renameRepo').post((req, res) => {
             connection.query("CALL renameRepo(?, ?, ?)",
                 [cleanUserUUID, cleanRepoId, cleanNewRepoName],
                 (error, results, fields) => {
-                    if (error) res.status(400).json(error);
+                    if (error) res.status(400).json("Error: you may not have permissions to do that");
                     else {
-                        res.json(results);
+                        res.json("Success");
                     }
                 });
         }
@@ -35,6 +42,9 @@ router.route('/renameRepo').post((req, res) => {
 /**
  * Checks if user in the repo or if they can even delete
  * If so, removes repo and deletes all user permissions for that repo
+ * 
+ * @param {String} userUUID
+ * @param {Int} repoID
  */
 router.route('/deleteRepo').post((req, res) => {
 
@@ -43,12 +53,12 @@ router.route('/deleteRepo').post((req, res) => {
 
 
     pool.getConnection((error, connection) => {
-        if (error) res.status(400).json("Error: " + error);
+        if (error) res.status(400).json("Error connecting to database");
         else {
             connection.query("SELECT * FROM user_repository_permissions WHERE (repo_id = ?) AND (user_id = (SELECT user_id FROM user WHERE user.userUUID = ?) )",
                 [cleanRepoID, cleanUserUUID],
                 (error, results, fields) => {
-                    if (error) res.status(400).json('Error: ' + error);
+                    if (error) res.status(400).json("Error: Something failed.");
                     else {
                         if (results[0].canDeleteRepo) {
                             //only removing people's permissions because i want to keep their data
@@ -73,19 +83,24 @@ router.route('/deleteRepo').post((req, res) => {
 
 })
 
+/**
+ * Gets an individuals repos
+ * 
+ * @param {String} userUUID
+ */
 router.route('/getRepos').get((req, res) => {
     const cleanUserUUID = xss(req.query.userUUID);
 
 
     pool.getConnection((error, connection) => {
-        if (error) res.status(400).json("Error: " + error);
+        if (error) res.status(400).json("Error connecting to database");
         else {
 
 
             connection.query("SELECT name, repo_id FROM repository NATURAL JOIN user_repository_permissions " +
                 "WHERE (user_repository_permissions.user_id = (SELECT user_id FROM user WHERE user.userUUID = ?)) ORDER BY date_created DESC",
                 cleanUserUUID, (error, results, fields) => {
-                    if (error) res.status(400).json('Error: ' + error);
+                    if (error) res.status(400).json("Error occured database-side");
                     else res.json(results);
                 })
         }
@@ -95,17 +110,23 @@ router.route('/getRepos').get((req, res) => {
     })
 })
 
+
+/**
+ * Gets the images in a specific repo. Any person with any permissions in a repo can view the images.
+ * @param {String} userUUID
+ * @param {Int} repoID
+ */
 router.route('/getRepoImages').get((req, res) => {
     const cleanRepoId = xss(req.query.repoID);
     const cleanUserUUID = xss(req.query.userUUID);
 
     pool.getConnection((error, connection) => {
-        if (error) res.status(400).json("Error: " + error);
+        if (error) res.status(400).json("Error connecting to database");
         else {
 
             connection.query("CALL getRepoImages(?, ?)",
                 [cleanRepoId, cleanUserUUID], (error, results, fields) => {
-                    if (error) res.status(400).json('Error: ' + error);
+                    if (error) res.status(400).json("Error retrieving repo images");
                     else {
                         if (results[0].length == undefined) res.json([results[0]]);
                         else res.json(results[0]);
@@ -119,7 +140,11 @@ router.route('/getRepoImages').get((req, res) => {
 })
 
 /**
- * The procedure from getRepos, except I am building the query based on however many tags are input.
+ * The procedure from getRepos, except I am building the query based on however many tags are input, and whether the images match those tags vaguely
+ * 
+ * @param {String} userUUID
+ * @param {Int} repoID
+ * @param {Array<String>} tags
  */
 router.route('/getRepoImagesFiltered').get((req, res) => {
     const cleanRepoID = xss(req.query.repoID);
@@ -130,12 +155,13 @@ router.route('/getRepoImagesFiltered').get((req, res) => {
     let inputs = [cleanRepoID];
 
     pool.getConnection((error, connection) => {
-        if (error) res.status(400).json("Error: " + error);
+        if (error) res.status(400).json("Error connecting to database");
         else {
 
-            connection.query("SELECT COUNT(*) AS 'rows' FROM user_repository_permissions WHERE user_id = (SELECT user_id FROM user WHERE (user.userUUID = ?) AND repo_id = ?)",
+            connection.query("SELECT COUNT(*) AS 'rows' FROM user_repository_permissions WHERE user_id = " +
+                "(SELECT user_id FROM user WHERE (user.userUUID = ?) AND repo_id = ?)",
                 [cleanUserUUID, cleanRepoID], (error, results, field) => {
-                    if (error) res.status(400).json("Error: " + error);
+                    if (error) res.status(400).json("Error database-side ");
                     else {
                         if (results[0].rows > 0) {
                             let query = "SELECT image_url.url, image_url.image_id, image_url.image_text AS title, tag.tag_text AS tags FROM image_url " +
@@ -158,7 +184,7 @@ router.route('/getRepoImagesFiltered').get((req, res) => {
 
 
                             connection.query(query, inputs, (error, results, field) => {
-                                if (error) res.status(400).json('Error: ' + error);
+                                if (error) res.status(400).json('Error database-side ');
                                 else {
                                     res.json(results);
 
@@ -182,7 +208,7 @@ router.route('/getRepoImagesFiltered').get((req, res) => {
  * 
  * @param {String} userUUID
  * @param {String} repoName
- * @param {Boolean} publicRepo
+ * @param {String} publicRepo //comes in as String due to REST
  */
 router.route('/newRepo').post((req, res) => {
 
@@ -195,16 +221,18 @@ router.route('/newRepo').post((req, res) => {
 
     if (cleanUserUUID.length < 1 || cleanRepoName.length < 1) res.json("failed");
     else {
-        //doing this in case of bad input
+
+        //Boolean input comes in as String, need to change it to 1 or 0 based on value
         var public = 0;
         if (cleanPublicRepo == 'true') public = 1;
+
         //gets connection from pool
         pool.getConnection((error, connection) => {
-            if (error) console.log('Error: ' + error);
+            if (error) console.log('Error connecting to database ');
             else {
                 connection.query("CALL newRepo(?, ?, ?)", [cleanUserUUID, cleanRepoName, public],
                     (error, results, fields) => {
-                        if (error) res.status(400).json(error);
+                        if (error) res.status(400).json("Error creating new repo");
                         else res.json("Success!");
                     })
             }
