@@ -135,7 +135,6 @@ router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
     try {
 
         const myFile = req.files;
-        let imageUrls = [];
 
         const cleanUserUUID = xss(req.body.userUUID);
         const cleanRepoID = xss(req.body.repoID);
@@ -181,11 +180,7 @@ router.post('/uploadImages', upload.array('files', 20), async (req, res) => {
 
                             }
                         })
-
-                    imageUrls.push(jsonImageInfo);
-
                 }
-
                 connection.release();
 
             }

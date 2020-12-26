@@ -18,7 +18,7 @@ router.route('/getInvites').get((req, res) => {
         else {
             connection.query("SELECT invite_id, repo_id FROM user_repo_invites WHERE invited_id = (SELECT user_id FROM user WHERE user.userUUID = ?)",
                 inputs, (error, results, fields) => {
-                    if (error) res.status(400).json(error);
+                    if (error) res.status(400).json("Error fetching inites");
                     else res.json(results);
                 })
         }
@@ -34,10 +34,12 @@ router.route('/getInvites').get((req, res) => {
  * @param {String} userUUID //the inviter
  * @param {Integer} repoId
  * @param {String} username //the invited
- * @param {Boolean} canUpload
- * @param {Boolean} canDeleteImg
- * @param {Boolean} canRenameRepo
- * @param {Boolean} canDeleteRepo
+ * 
+ * These booleans come in as Strings
+ * @param {String} canUpload
+ * @param {String} canDeleteImg
+ * @param {String} canRenameRepo
+ * @param {String} canDeleteRepo
  */
 router.route('/inviteUser').post((req, res) => {
 
@@ -66,11 +68,11 @@ router.route('/inviteUser').post((req, res) => {
 
 
     pool.getConnection((error, connection) => {
-        if (error) console.log('Error: ' + error);
+        if (error) console.log('Error connecting to database');
         else {
             connection.query("CALL inviteUser(?, ?, ?, ?, ?, ?, ?)",
                 inputs, (error, results, fields) => {
-                    if (error) res.status(400).json(error);
+                    if (error) res.status(400).json("Error inviting user");
                     else res.json("Success!");
                 })
         }
@@ -80,6 +82,14 @@ router.route('/inviteUser').post((req, res) => {
     })
 });
 
+
+/**
+ * Accepts an invite if it exists
+ * 
+ * @param {String} userUUID
+ * @param {Int} repoId
+ * @param {Int} invitedId 
+ */
 router.route('/acceptInvite').post((req, res) => {
 
     const cleanUserUUID = xss(req.body.userUUID);
@@ -89,7 +99,7 @@ router.route('/acceptInvite').post((req, res) => {
     let inputs = [cleanInviteId, cleanUserUUID, cleanRepoId];
     pool.getConnection((error, connection) => {
 
-        if (error) console.log('Error: ' + error);
+        if (error) res.status(400).json("Error connecting to database");
         else {
             //make them send in invite id, userUUID, and repoID to authenticate its not just a modified REST request 
 
@@ -101,14 +111,10 @@ router.route('/acceptInvite').post((req, res) => {
             connection.query("CALL acceptInvite(?, ?, ?)",
                 inputs,
                 (error, results, fields) => {
-                    if (error) res.status(400).json(error);
+                    if (error) res.status(400).json("Error accepting invite");
                     else res.json("success");
                 })
-
-
         }
-
-
         connection.release();
     })
 })
