@@ -1,40 +1,38 @@
-const express = require('express')
-const app = express();
-const cors = require("cors");
-
-
 const bodyParser = require('body-parser');
-
-
-app.use(cors());
-app.use(express.json());
-
-const port = process.env.PORT || 5000;
-
-
-app.disable('x-powered-by');
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-
-
-
+const express = require('express')
+const cors = require("cors");
 
 //initialize connection pool
 var pool = require('./config/mysqlConnector');
 
-
-
-const userRouter = require("./routes/user");
-const imageRouter = require("./routes/image");
-const repoRouter = require("./routes/repo");
+// routes
 const repoInvitesRouter = require("./routes/repoInvites");
+const imageRouter = require("./routes/image");
+const userRouter = require("./routes/user");
+const repoRouter = require("./routes/repo");
+
+
+const port = process.env.PORT || 5000;
+
+const app = express();
+
+app.use(cors());
+
+app.disable('x-powered-by');
+
+app.use(express.json());
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use("/user", userRouter);
 app.use("/image", imageRouter);
 app.use("/repo", repoRouter);
 app.use("/repoInvite", repoInvitesRouter);
 
-
+app.get('/', (req, res) => {
+    res.send("Deployed");
+})
 
 app.use((err, req, res, next) => {
     res.status(500).json({
@@ -44,10 +42,6 @@ app.use((err, req, res, next) => {
     next()
 })
 
-
-app.get('/', (req, res) => {
-    res.send("Deployed");
-})
 
 app.listen(port, () => {
     console.log(`Server is running on port: ${port}`);
