@@ -2,8 +2,21 @@ const bodyParser = require('body-parser');
 const express = require('express')
 const cors = require("cors");
 
+require('dotenv').config();
+
+
 //initialize connection pool
 var pool = require('./config/mysqlConnector');
+
+pool.getConnection((error, connection) => {
+    if (error) console.log(error)
+
+    connection.query("SELECT * FROM user", [], (error, results, fields) => {
+        if (error) console.log(error)
+        console.log(results);
+    })
+})
+
 
 // routes
 const repoInvitesRouter = require("./routes/repoInvites");
