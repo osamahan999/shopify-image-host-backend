@@ -1,10 +1,9 @@
 Frontend repository with a much more indepth readme about the project @https://github.com/osamahan999/shopify-image-host-frontend
 
 To run this, you must either: 
-Simply navigate to the hosted version @https://shopifyimagerepofrontend.uc.r.appspot.com/ 
+Hosted version is offline b/c I'm out of google cloud credits lol
 
-
-or set up on your own machine by following these steps: 
+set up on your own machine by following these steps: 
 
 1. Clone the repo from my github 
 2. npm install
